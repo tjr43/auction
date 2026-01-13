@@ -159,14 +159,15 @@
         // =========================================================================
         // [중요] 깃허브 배포 시 본인의 설정값으로 교체 필수!
         // =========================================================================
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "본인의_API_KEY",
-            authDomain: "본인의_DOMAIN",
-            projectId: "본인의_PROJECT_ID",
-            storageBucket: "...",
-            messagingSenderId: "...",
-            appId: "..."
+        const firebaseConfig = {
+            apiKey: "AIzaSyAYyjK1qwPObsSXFSEmnye64iTFvcIY1Lg",
+            authDomain: "auction-dfc5c.firebaseapp.com",
+            projectId: "auction-dfc5c",
+            storageBucket: "auction-dfc5c.firebasestorage.app",
+            messagingSenderId: "422510640786",
+            appId: "1:422510640786:web:7fdd804b61ac401408b04b"
         };
+
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'auction-room-01';
 
         const app = initializeApp(firebaseConfig);
