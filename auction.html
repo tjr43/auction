@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>온라인 경매 시스템</title>
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -26,13 +24,11 @@
     <style>
         body { font-family: 'Apple SD Gothic Neo', sans-serif; background-color: #1a1a1a; color: #e0e0e0; overflow: hidden; }
         .scroll-hide::-webkit-scrollbar { display: none; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #ffd43b; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="h-screen flex flex-col">
 
-    <!-- 로그인 모달 (역할 선택) -->
+    <!-- 로그인 모달 -->
     <div id="login-modal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
         <div class="bg-panel p-8 rounded-xl max-w-md w-full text-center border border-gray-700 shadow-2xl">
             <h2 class="text-3xl font-bold text-highlight mb-6">🎲 온라인 경매 입장</h2>
@@ -54,7 +50,7 @@
         </div>
     </div>
 
-    <!-- 메인 레이아웃 -->
+    <!-- 헤더 -->
     <header class="bg-black border-b border-gray-700 h-14 flex items-center justify-between px-6 shrink-0">
         <div class="flex items-center gap-2">
             <i class="fa-solid fa-gavel text-highlight"></i>
@@ -67,57 +63,45 @@
     </header>
 
     <div class="flex flex-1 overflow-hidden">
-        
-        <!-- 왼쪽: 대기실 (이미지 관리) -->
+        <!-- 왼쪽: 대기실 -->
         <div class="w-1/5 bg-panel border-r border-gray-700 flex flex-col p-4">
             <h3 class="font-bold mb-4 flex justify-between items-center">
                 <span>📂 대기실</span>
                 <span id="waiting-count" class="text-xs bg-gray-700 px-2 py-1 rounded">0</span>
             </h3>
-            
-            <!-- 업로드 버튼 -->
             <div class="mb-4">
                 <input type="file" id="fileInput" multiple accept="image/*" class="hidden" onchange="uploadImages(this.files)">
                 <button onclick="document.getElementById('fileInput').click()" class="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition">
                     <i class="fa-solid fa-cloud-arrow-up"></i> 사진 추가
                 </button>
             </div>
-
-            <div id="waiting-grid" class="flex-1 overflow-y-auto grid grid-cols-2 gap-2 content-start pr-1">
-                <!-- 이미지 썸네일 -->
-            </div>
+            <div id="waiting-grid" class="flex-1 overflow-y-auto grid grid-cols-2 gap-2 content-start pr-1"></div>
         </div>
 
         <!-- 중앙: 경매 스테이지 -->
         <div class="w-1/2 bg-dark flex flex-col relative">
-            <!-- 메인 화면 -->
             <div class="flex-1 flex flex-col justify-center items-center p-8">
                 <div class="relative w-80 h-80 bg-black rounded-2xl border-4 border-gray-600 shadow-2xl overflow-hidden flex justify-center items-center mb-6">
                     <img id="main-display" src="" class="w-full h-full object-cover hidden">
                     <div id="placeholder-text" class="text-gray-500 text-center">
                         <i class="fa-solid fa-image text-4xl mb-2"></i><br>경매 대기중
                     </div>
-                    <!-- 룰렛 애니메이션용 오버레이 -->
                     <div id="roulette-overlay" class="absolute inset-0 bg-black flex justify-center items-center hidden z-10">
                         <img id="roulette-img" class="w-full h-full object-cover opacity-80">
                     </div>
                 </div>
-
                 <div class="text-center space-y-2">
                     <div class="text-gray-400 text-sm">현재 가격</div>
                     <div class="text-5xl font-bold text-highlight drop-shadow-lg"><span id="current-price">0</span>원</div>
                     <div id="auction-status" class="h-6 text-sm text-gray-500">시작 전</div>
                 </div>
-
-                <!-- 경매 시작 버튼 -->
                 <button id="btn-start" onclick="startAuction()" class="mt-8 px-8 py-3 bg-highlight text-black font-bold rounded-full hover:bg-yellow-400 transition hidden shadow-lg shadow-yellow-500/20">
                     START AUCTION
                 </button>
             </div>
 
-            <!-- 컨트롤 패널 (하단) -->
+            <!-- 컨트롤 패널 -->
             <div class="h-48 border-t border-gray-700 flex">
-                <!-- A팀 컨트롤 -->
                 <div id="ctrl-a" class="flex-1 bg-gradient-to-t from-red-900/20 to-transparent p-4 flex flex-col items-center justify-center opacity-30 pointer-events-none transition-all duration-300">
                     <h4 class="text-accentA font-bold mb-2">TEAM A</h4>
                     <input type="number" id="input-a" class="bg-gray-800 border border-gray-600 rounded p-2 w-32 text-center mb-2 text-white" placeholder="금액">
@@ -126,7 +110,6 @@
                         <button onclick="passTurn('A')" class="px-4 py-2 bg-gray-600 text-white rounded font-bold hover:bg-gray-500">포기</button>
                     </div>
                 </div>
-                <!-- B팀 컨트롤 -->
                 <div id="ctrl-b" class="flex-1 bg-gradient-to-t from-blue-900/20 to-transparent p-4 flex flex-col items-center justify-center opacity-30 pointer-events-none transition-all duration-300">
                     <h4 class="text-accentB font-bold mb-2">TEAM B</h4>
                     <input type="number" id="input-b" class="bg-gray-800 border border-gray-600 rounded p-2 w-32 text-center mb-2 text-white" placeholder="금액">
@@ -140,7 +123,6 @@
 
         <!-- 오른쪽: 정보 및 채팅 -->
         <div class="w-[30%] bg-panel border-l border-gray-700 flex flex-col p-4">
-            <!-- 팀 현황 -->
             <div class="space-y-4 mb-4">
                 <div class="bg-dark p-3 rounded-lg border-l-4 border-accentA">
                     <div class="flex justify-between mb-2">
@@ -157,8 +139,6 @@
                     <div id="roster-b" class="flex flex-wrap gap-1 h-16 overflow-y-auto content-start"></div>
                 </div>
             </div>
-
-            <!-- 채팅 -->
             <div class="flex-1 bg-black rounded-lg border border-gray-700 flex flex-col overflow-hidden">
                 <div id="chat-box" class="flex-1 overflow-y-auto p-3 text-sm space-y-1"></div>
                 <form onsubmit="sendChat(event)" class="flex border-t border-gray-700">
@@ -169,45 +149,40 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK (getDocs, deleteDoc 추가됨) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, updateDoc, setDoc, arrayUnion, arrayRemove, collection, addDoc, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // *** 중요: getDocs, deleteDoc가 반드시 포함되어야 합니다 ***
+        import { getFirestore, doc, onSnapshot, updateDoc, setDoc, arrayUnion, collection, addDoc, query, orderBy, limit, serverTimestamp, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =========================================================================
-        // 1. Firebase 설정
+        // [중요] 깃허브 배포 시 본인의 설정값으로 교체 필수!
         // =========================================================================
-        const firebaseConfig = {
-            apiKey: "AIzaSyAYyjK1qwPObsSXFSEmnye64iTFvcIY1Lg",
-            authDomain: "auction-dfc5c.firebaseapp.com",
-            projectId: "auction-dfc5c",
-            storageBucket: "auction-dfc5c.firebasestorage.app",
-            messagingSenderId: "422510640786",
-            appId: "1:422510640786:web:7fdd804b61ac401408b04b"
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "본인의_API_KEY",
+            authDomain: "본인의_DOMAIN",
+            projectId: "본인의_PROJECT_ID",
+            storageBucket: "...",
+            messagingSenderId: "...",
+            appId: "..."
         };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'auction-room-01';
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // [중요] 경로 상수 수정: 짝수 레벨(6단계) 경로를 사용하기 위한 베이스
-        // 기존 코드의 'public/data' (4단계) 뒤에 컬렉션과 문서ID를 명시적으로 붙여서 사용
-        const BASE_PATH_PREFIX = `artifacts/auction-room-01/public/data`;
+        // 경로 상수
+        const BASE_PATH = `artifacts/${appId}/public/data`;
         
-        // 전역 상태
         let myRole = null; 
         let myUid = null;
         let gameState = { teams: { A: {}, B: {} } };
 
-        // 문서 참조 헬퍼 함수 (경로 오류 방지용)
-        // artifacts(c) -> room(d) -> public(c) -> data(d) -> teams(c) -> general(d) [6단계]
-        const getTeamsRef = () => doc(db, BASE_PATH_PREFIX, 'teams', 'general');
-        const getGameStateRef = () => doc(db, BASE_PATH_PREFIX, 'game_state', 'general');
+        const getTeamsRef = () => doc(db, BASE_PATH, 'teams', 'general');
+        const getGameStateRef = () => doc(db, BASE_PATH, 'game_state', 'general');
 
-        // =========================================================================
-        // 2. 초기화 및 로그인 로직
-        // =========================================================================
         async function init() {
             try {
                 await signInAnonymously(auth);
@@ -220,21 +195,15 @@
                 });
             } catch (e) {
                 console.error("Auth Error:", e);
-                alert("Firebase 연결 실패. 설정을 확인하세요.");
+                alert("Firebase 연결 실패.");
             }
         }
         init();
 
         window.selectRole = async (role) => {
             if (!myUid) return alert("로그인 정보가 없습니다.");
-            
-            // 역할 점유 확인
-            if (role === 'A' && gameState.teams?.A?.leader && gameState.teams.A.leader !== myUid) {
-                alert("A팀장은 이미 접속 중입니다."); return;
-            }
-            if (role === 'B' && gameState.teams?.B?.leader && gameState.teams.B.leader !== myUid) {
-                alert("B팀장은 이미 접속 중입니다."); return;
-            }
+            if (role === 'A' && gameState.teams?.A?.leader && gameState.teams.A.leader !== myUid) return alert("이미 접속 중입니다.");
+            if (role === 'B' && gameState.teams?.B?.leader && gameState.teams.B.leader !== myUid) return alert("이미 접속 중입니다.");
 
             myRole = role;
             document.getElementById('login-modal').classList.add('hidden');
@@ -245,8 +214,6 @@
                 const updates = {};
                 if (role === 'A') updates["A.leader"] = myUid;
                 if (role === 'B') updates["B.leader"] = myUid;
-
-                // 문서 업데이트 시도, 없으면 생성
                 await updateDoc(getTeamsRef(), updates).catch(async () => {
                      await setDoc(getTeamsRef(), {
                         A: { money: 1000, roster: [], leader: role === 'A' ? myUid : null },
@@ -257,24 +224,15 @@
             sendSystemMessage(`${roleName}님이 입장했습니다.`);
         };
 
-        // =========================================================================
-        // 3. 리스너 (데이터 동기화)
-        // =========================================================================
         function setupListeners() {
-            // (1) 게임 상태
             onSnapshot(getGameStateRef(), (snap) => {
                 if (!snap.exists()) return;
                 const data = snap.data();
-                gameState.status = data.status; 
-                gameState.currentPrice = data.currentPrice;
-                gameState.currentBidder = data.currentBidder;
-                gameState.currentItem = data.currentItem;
-                
+                gameState = { ...gameState, ...data };
                 renderGameUI(data);
                 handleRouletteEffect(data);
             });
 
-            // (2) 팀 정보
             onSnapshot(getTeamsRef(), (snap) => {
                 if (!snap.exists()) return;
                 const data = snap.data();
@@ -290,18 +248,13 @@
                 if(statusA) statusA.innerText = data.A?.leader ? '접속중' : '대기중';
                 if(statusB) statusB.innerText = data.B?.leader ? '접속중' : '대기중';
 
-                // 시작 버튼 표시 로직
                 const bothReady = data.A?.leader && data.B?.leader;
                 const btnStart = document.getElementById('btn-start');
-                if (bothReady && gameState.status === 'idle') {
-                    btnStart.classList.remove('hidden');
-                } else {
-                    btnStart.classList.add('hidden');
-                }
+                if (bothReady && gameState.status === 'idle') btnStart.classList.remove('hidden');
+                else btnStart.classList.add('hidden');
             });
 
-            // (3) 대기실 이미지 (컬렉션 조회)
-            const qImages = query(collection(db, BASE_PATH_PREFIX, 'images'), orderBy('createdAt'));
+            const qImages = query(collection(db, BASE_PATH, 'images'), orderBy('createdAt'));
             onSnapshot(qImages, (snap) => {
                 const grid = document.getElementById('waiting-grid');
                 grid.innerHTML = '';
@@ -317,8 +270,7 @@
                 document.getElementById('waiting-count').innerText = gameState.images.length;
             });
 
-            // (4) 채팅
-            const qChat = query(collection(db, BASE_PATH_PREFIX, 'chat'), orderBy('timestamp', 'desc'), limit(50));
+            const qChat = query(collection(db, BASE_PATH, 'chat'), orderBy('timestamp', 'desc'), limit(50));
             onSnapshot(qChat, (snap) => {
                 const box = document.getElementById('chat-box');
                 box.innerHTML = '';
@@ -339,9 +291,6 @@
             });
         }
 
-        // =========================================================================
-        // 4. UI 렌더링
-        // =========================================================================
         function renderGameUI(state) {
             const priceEl = document.getElementById('current-price');
             const statusEl = document.getElementById('auction-status');
@@ -350,7 +299,7 @@
             const ctrlA = document.getElementById('ctrl-a');
             const ctrlB = document.getElementById('ctrl-b');
 
-            priceEl.innerText = state.currentPrice;
+            priceEl.innerText = state.currentPrice || 0;
 
             if (state.currentItem) {
                 mainImg.src = state.currentItem;
@@ -374,9 +323,8 @@
                 ctrlB.style.opacity = (myRole === 'B' && canBid) ? '1' : '0.3';
                 ctrlB.style.pointerEvents = (myRole === 'B' && canBid) ? 'auto' : 'none';
 
-                if(myRole === 'A' && canBid) document.getElementById('input-a').value = state.currentPrice + 10;
-                if(myRole === 'B' && canBid) document.getElementById('input-b').value = state.currentPrice + 10;
-
+                if(myRole === 'A' && canBid) document.getElementById('input-a').value = (state.currentPrice || 0) + 10;
+                if(myRole === 'B' && canBid) document.getElementById('input-b').value = (state.currentPrice || 0) + 10;
             } else {
                 statusEl.innerText = state.status === 'rolling' ? "추첨 중..." : "다음 경매 대기중";
                 ctrlA.style.opacity = '0.3'; ctrlA.style.pointerEvents = 'none';
@@ -384,27 +332,23 @@
             }
         }
 
-        function renderRoster(elementId, rosterArray) {
-            const container = document.getElementById(elementId);
-            container.innerHTML = '';
-            if (!rosterArray) return;
-            rosterArray.forEach(url => {
+        function renderRoster(id, roster) {
+            const el = document.getElementById(id);
+            el.innerHTML = '';
+            if (roster) roster.forEach(url => {
                 const img = document.createElement('img');
                 img.src = url;
                 img.className = "w-8 h-8 object-cover rounded border border-gray-600";
-                container.appendChild(img);
+                el.appendChild(img);
             });
         }
 
-        // =========================================================================
-        // 5. 액션 함수
-        // =========================================================================
         window.uploadImages = async (files) => {
             if (!files.length) return;
             for (let i = 0; i < files.length; i++) {
                 const reader = new FileReader();
                 reader.onload = async (e) => {
-                    await addDoc(collection(db, BASE_PATH_PREFIX, 'images'), {
+                    await addDoc(collection(db, BASE_PATH, 'images'), {
                         data: e.target.result,
                         createdAt: serverTimestamp()
                     });
@@ -415,15 +359,11 @@
         };
 
         window.startAuction = async () => {
-            if (!gameState.images || gameState.images.length === 0) {
-                alert("대기실에 이미지가 없습니다!"); return;
-            }
+            if (!gameState.images || gameState.images.length === 0) return alert("대기실에 이미지가 없습니다!");
             const randIdx = Math.floor(Math.random() * gameState.images.length);
-            const selectedItem = gameState.images[randIdx];
-
             await updateDoc(getGameStateRef(), {
                 status: 'rolling',
-                rollingTarget: selectedItem,
+                rollingTarget: gameState.images[randIdx],
                 timestamp: Date.now()
             });
         };
@@ -435,76 +375,48 @@
                 const overlay = document.getElementById('roulette-overlay');
                 const imgEl = document.getElementById('roulette-img');
                 overlay.classList.remove('hidden');
-                
                 let count = 0;
                 const interval = setInterval(() => {
-                    const r = Math.floor(Math.random() * gameState.images.length);
-                    imgEl.src = gameState.images[r];
+                    imgEl.src = gameState.images[Math.floor(Math.random() * gameState.images.length)];
                     count++;
                     if (count >= 20) {
                         clearInterval(interval);
-                        setTimeout(() => { finishRolling(data.rollingTarget); }, 500);
+                        setTimeout(() => finishRolling(data.rollingTarget), 500);
                     }
                 }, 100);
             }
         }
 
-        async function finishRolling(targetItem) {
+        async function finishRolling(target) {
             document.getElementById('roulette-overlay').classList.add('hidden');
             isRolling = false;
-            
-            // 리더A (없으면 리더B)가 상태 업데이트
-            const isLeaderA = myUid === gameState.teams.A?.leader;
-            const isLeaderB = myUid === gameState.teams.B?.leader;
-            const noLeaderA = !gameState.teams.A?.leader;
-
-            if (isLeaderA || (noLeaderA && isLeaderB)) {
+            // 중복 실행 방지: 리더 A가 대표로 업데이트 (없으면 리더 B)
+            if (myRole === 'A' || (myRole === 'B' && !gameState.teams.A?.leader)) {
                  await updateDoc(getGameStateRef(), {
-                    status: 'auction',
-                    currentItem: targetItem,
-                    currentPrice: 10,
-                    currentBidder: null
+                    status: 'auction', currentItem: target, currentPrice: 10, currentBidder: null
                 });
             }
         }
 
         window.placeBid = async (team) => {
-            const inputId = team === 'A' ? 'input-a' : 'input-b';
-            const bidAmount = parseInt(document.getElementById(inputId).value);
-            const myTeamMoney = gameState.teams[team].money || 0;
-
-            if (bidAmount > myTeamMoney) { alert("돈이 부족합니다!"); return; }
-            if (bidAmount <= gameState.currentPrice) { alert("현재가보다 높아야 합니다."); return; }
-
-            await updateDoc(getGameStateRef(), {
-                currentPrice: bidAmount,
-                currentBidder: team
-            });
-            sendSystemMessage(`${team}팀이 ${bidAmount}원에 입찰했습니다!`);
+            const val = parseInt(document.getElementById(team === 'A' ? 'input-a' : 'input-b').value);
+            if (val > (gameState.teams[team].money || 0)) return alert("돈이 부족합니다!");
+            if (val <= (gameState.currentPrice || 0)) return alert("현재가보다 높아야 합니다.");
+            
+            await updateDoc(getGameStateRef(), { currentPrice: val, currentBidder: team });
+            sendSystemMessage(`${team}팀이 ${val}원에 입찰했습니다!`);
         };
 
         window.passTurn = async (team) => {
-            if (!confirm("정말 포기하시겠습니까? 상대에게 낙찰됩니다.")) return;
-            
+            if (!confirm("포기하시겠습니까?")) return;
             const opponent = team === 'A' ? 'B' : 'A';
-            const price = gameState.currentPrice;
-            const item = gameState.currentItem;
-
-            // 낙찰 처리
+            const price = gameState.currentPrice || 0;
             const updates = {};
             updates[`${opponent}.money`] = (gameState.teams[opponent].money || 0) - price;
-            updates[`${opponent}.roster`] = arrayUnion(item);
-
-            await updateDoc(getTeamsRef(), updates);
+            updates[`${opponent}.roster`] = arrayUnion(gameState.currentItem);
             
-            // 상태 초기화
-            await updateDoc(getGameStateRef(), {
-                status: 'idle',
-                currentBidder: null,
-                currentItem: null,
-                currentPrice: 10
-            });
-
+            await updateDoc(getTeamsRef(), updates);
+            await updateDoc(getGameStateRef(), { status: 'idle', currentBidder: null, currentItem: null, currentPrice: 10 });
             sendSystemMessage(`🎉 [낙찰] ${opponent}팀이 ${price}원에 영입 성공!`);
         };
 
@@ -513,8 +425,7 @@
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
             if (!text) return;
-            
-            await addDoc(collection(db, BASE_PATH_PREFIX, 'chat'), {
+            await addDoc(collection(db, BASE_PATH, 'chat'), {
                 sender: myRole === 'A' ? 'A팀장' : (myRole === 'B' ? 'B팀장' : '관전자'),
                 role: myRole || 'spectator',
                 text: text,
@@ -525,31 +436,37 @@
         };
 
         async function sendSystemMessage(text) {
-            await addDoc(collection(db, BASE_PATH_PREFIX, 'chat'), {
-                text: text,
-                type: 'system',
-                timestamp: serverTimestamp()
-            });
+            await addDoc(collection(db, BASE_PATH, 'chat'), { text, type: 'system', timestamp: serverTimestamp() });
         }
 
+        // [핵심] 완전 초기화 로직 (이미지, 채팅 컬렉션 순회 삭제)
         window.resetGame = async () => {
-            if (!confirm("모든 데이터를 초기화하시겠습니까? (팀원, 돈, 대기실 등)")) return;
+            if (!confirm("정말 모든 데이터를 삭제하시겠습니까? (이미지 포함)")) return;
             
+            // 1. 문서 리셋
             await setDoc(getTeamsRef(), {
                 A: { money: 1000, roster: [], leader: null },
                 B: { money: 1000, roster: [], leader: null }
             });
             await setDoc(getGameStateRef(), {
-                status: 'idle',
-                currentPrice: 10,
-                currentBidder: null,
-                currentItem: null
+                status: 'idle', currentPrice: 10, currentBidder: null, currentItem: null
             });
-            
-            alert("초기화 완료. 페이지를 새로고침하세요.");
-            location.reload();
-        };
 
+            // 2. 이미지 컬렉션 전체 삭제
+            const imagesQ = query(collection(db, BASE_PATH, 'images'));
+            const imagesSnap = await getDocs(imagesQ);
+            const imgPromises = imagesSnap.docs.map(doc => deleteDoc(doc.ref));
+            await Promise.all(imgPromises);
+
+             // 3. 채팅 컬렉션 전체 삭제
+            const chatQ = query(collection(db, BASE_PATH, 'chat'));
+            const chatSnap = await getDocs(chatQ);
+            const chatPromises = chatSnap.docs.map(doc => deleteDoc(doc.ref));
+            await Promise.all(chatPromises);
+
+            alert("초기화 완료!");
+            location.reload();
+        }
     </script>
 </body>
 </html>
