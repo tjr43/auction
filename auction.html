@@ -6,7 +6,7 @@
     <title>온라인 경매 시스템</title>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Tailwind CSS (스타일링 간소화) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -50,7 +50,7 @@
                     👀 관전자로 입장
                 </button>
             </div>
-            <p class="mt-6 text-xs text-gray-500">* Firebase 설정이 올바른지 확인해주세요.</p>
+            <p class="mt-6 text-xs text-gray-500">* Firebase 연결 대기 중...</p>
         </div>
     </div>
 
@@ -75,7 +75,7 @@
                 <span id="waiting-count" class="text-xs bg-gray-700 px-2 py-1 rounded">0</span>
             </h3>
             
-            <!-- 업로드 버튼 (누구나 가능하거나 특정인만 가능하도록 설정) -->
+            <!-- 업로드 버튼 -->
             <div class="mb-4">
                 <input type="file" id="fileInput" multiple accept="image/*" class="hidden" onchange="uploadImages(this.files)">
                 <button onclick="document.getElementById('fileInput').click()" class="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition">
@@ -109,7 +109,7 @@
                     <div id="auction-status" class="h-6 text-sm text-gray-500">시작 전</div>
                 </div>
 
-                <!-- 경매 시작 버튼 (조건부 표시) -->
+                <!-- 경매 시작 버튼 -->
                 <button id="btn-start" onclick="startAuction()" class="mt-8 px-8 py-3 bg-highlight text-black font-bold rounded-full hover:bg-yellow-400 transition hidden shadow-lg shadow-yellow-500/20">
                     START AUCTION
                 </button>
@@ -139,7 +139,7 @@
         </div>
 
         <!-- 오른쪽: 정보 및 채팅 -->
-        <div class="w-3/10 bg-panel border-l border-gray-700 flex flex-col p-4 w-[30%]">
+        <div class="w-[30%] bg-panel border-l border-gray-700 flex flex-col p-4">
             <!-- 팀 현황 -->
             <div class="space-y-4 mb-4">
                 <div class="bg-dark p-3 rounded-lg border-l-4 border-accentA">
@@ -169,14 +169,14 @@
         </div>
     </div>
 
-    <!-- Firebase SDK (모듈 방식 아님, CDN 방식 사용) -->
+    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, updateDoc, setDoc, arrayUnion, arrayRemove, collection, addDoc, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =========================================================================
-        // 1. Firebase 설정 (본인의 설정값으로 교체 필수!)
+        // 1. Firebase 설정
         // =========================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyAYyjK1qwPObsSXFSEmnye64iTFvcIY1Lg",
@@ -186,37 +186,38 @@
             messagingSenderId: "422510640786",
             appId: "1:422510640786:web:7fdd804b61ac401408b04b"
         };
-        
 
-        // -------------------------------------------------------------------------
-
-        // 앱 초기화
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // [중요] 경로 상수 수정: 짝수 레벨(6단계) 경로를 사용하기 위한 베이스
+        // 기존 코드의 'public/data' (4단계) 뒤에 컬렉션과 문서ID를 명시적으로 붙여서 사용
+        const BASE_PATH_PREFIX = `artifacts/auction-room-01/public/data`;
+        
         // 전역 상태
-        let myRole = null; // 'A', 'B', 'spectator'
+        let myRole = null; 
         let myUid = null;
-        let gameState = {};
-        
-        // Firestore 경로 상수 (규칙 준수)
-        // 실제 사용 시 'default-app-id' 부분을 유니크한 방 이름으로 바꾸면 여러 방 생성 가능
-        const APP_ID = 'auction-room-01'; 
-        const PUBLIC_PATH = `artifacts/${APP_ID}/public/data`;
-        
+        let gameState = { teams: { A: {}, B: {} } };
+
+        // 문서 참조 헬퍼 함수 (경로 오류 방지용)
+        // artifacts(c) -> room(d) -> public(c) -> data(d) -> teams(c) -> general(d) [6단계]
+        const getTeamsRef = () => doc(db, BASE_PATH_PREFIX, 'teams', 'general');
+        const getGameStateRef = () => doc(db, BASE_PATH_PREFIX, 'game_state', 'general');
+
         // =========================================================================
         // 2. 초기화 및 로그인 로직
         // =========================================================================
         async function init() {
             try {
-                const cred = await signInAnonymously(auth);
-                myUid = cred.user.uid;
-                console.log("Logged in:", myUid);
-
-                // 리스너 연결
-                setupListeners();
-
+                await signInAnonymously(auth);
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        myUid = user.uid;
+                        console.log("Logged in:", myUid);
+                        setupListeners();
+                    }
+                });
             } catch (e) {
                 console.error("Auth Error:", e);
                 alert("Firebase 연결 실패. 설정을 확인하세요.");
@@ -225,7 +226,9 @@
         init();
 
         window.selectRole = async (role) => {
-            // 역할 점유 확인 로직 (간단하게 구현)
+            if (!myUid) return alert("로그인 정보가 없습니다.");
+            
+            // 역할 점유 확인
             if (role === 'A' && gameState.teams?.A?.leader && gameState.teams.A.leader !== myUid) {
                 alert("A팀장은 이미 접속 중입니다."); return;
             }
@@ -234,33 +237,35 @@
             }
 
             myRole = role;
-            
-            // UI 업데이트
             document.getElementById('login-modal').classList.add('hidden');
             const roleName = role === 'A' ? '🔴 A팀장' : (role === 'B' ? '🔵 B팀장' : '👀 관전자');
             document.getElementById('my-role-display').innerText = roleName;
 
-            // DB에 역할 등록 (팀장인 경우)
-            if (role === 'A') updateDoc(doc(db, PUBLIC_PATH, 'teams'), { "A.leader": myUid });
-            if (role === 'B') updateDoc(doc(db, PUBLIC_PATH, 'teams'), { "B.leader": myUid });
+            if (role !== 'spectator') {
+                const updates = {};
+                if (role === 'A') updates["A.leader"] = myUid;
+                if (role === 'B') updates["B.leader"] = myUid;
 
-            // 시스템 메시지
+                // 문서 업데이트 시도, 없으면 생성
+                await updateDoc(getTeamsRef(), updates).catch(async () => {
+                     await setDoc(getTeamsRef(), {
+                        A: { money: 1000, roster: [], leader: role === 'A' ? myUid : null },
+                        B: { money: 1000, roster: [], leader: role === 'B' ? myUid : null }
+                     }, { merge: true });
+                });
+            }
             sendSystemMessage(`${roleName}님이 입장했습니다.`);
         };
 
         // =========================================================================
-        // 3. 실시간 데이터 동기화 (Listeners)
+        // 3. 리스너 (데이터 동기화)
         // =========================================================================
         function setupListeners() {
-            // (1) 게임 상태 리스너
-            onSnapshot(doc(db, PUBLIC_PATH, 'game_state'), (snap) => {
-                if (!snap.exists()) {
-                    // 데이터가 없으면 초기화
-                    resetGame();
-                    return;
-                }
+            // (1) 게임 상태
+            onSnapshot(getGameStateRef(), (snap) => {
+                if (!snap.exists()) return;
                 const data = snap.data();
-                gameState.status = data.status; // 'idle', 'rolling', 'auction', 'finished'
+                gameState.status = data.status; 
                 gameState.currentPrice = data.currentPrice;
                 gameState.currentBidder = data.currentBidder;
                 gameState.currentItem = data.currentItem;
@@ -269,32 +274,25 @@
                 handleRouletteEffect(data);
             });
 
-            // (2) 팀 정보 리스너
-            onSnapshot(doc(db, PUBLIC_PATH, 'teams'), (snap) => {
+            // (2) 팀 정보
+            onSnapshot(getTeamsRef(), (snap) => {
                 if (!snap.exists()) return;
                 const data = snap.data();
                 gameState.teams = data;
                 
-                // 돈 UI
-                document.getElementById('money-a').innerText = (data.A.money || 0) + '원';
-                document.getElementById('money-b').innerText = (data.B.money || 0) + '원';
+                document.getElementById('money-a').innerText = (data.A?.money || 0) + '원';
+                document.getElementById('money-b').innerText = (data.B?.money || 0) + '원';
+                renderRoster('roster-a', data.A?.roster);
+                renderRoster('roster-b', data.B?.roster);
 
-                // 로스터 UI
-                renderRoster('roster-a', data.A.roster);
-                renderRoster('roster-b', data.B.roster);
-
-                // 로그인 모달 상태 표시
                 const statusA = document.getElementById('status-a');
                 const statusB = document.getElementById('status-b');
-                if(statusA) statusA.innerText = data.A.leader ? '접속중' : '대기중';
-                if(statusB) statusB.innerText = data.B.leader ? '접속중' : '대기중';
-                if(statusA) statusA.className = `text-xs px-2 py-1 rounded ${data.A.leader ? 'bg-green-600' : 'bg-gray-600'}`;
-                if(statusB) statusB.className = `text-xs px-2 py-1 rounded ${data.B.leader ? 'bg-green-600' : 'bg-gray-600'}`;
+                if(statusA) statusA.innerText = data.A?.leader ? '접속중' : '대기중';
+                if(statusB) statusB.innerText = data.B?.leader ? '접속중' : '대기중';
 
-                // 경매 시작 버튼 활성화 체크 (둘 다 접속 & idle 상태일 때)
-                const bothReady = data.A.leader && data.B.leader;
+                // 시작 버튼 표시 로직
+                const bothReady = data.A?.leader && data.B?.leader;
                 const btnStart = document.getElementById('btn-start');
-                
                 if (bothReady && gameState.status === 'idle') {
                     btnStart.classList.remove('hidden');
                 } else {
@@ -302,17 +300,15 @@
                 }
             });
 
-            // (3) 대기실 이미지 리스너
-            const qImages = query(collection(db, PUBLIC_PATH, 'images'), orderBy('createdAt'));
+            // (3) 대기실 이미지 (컬렉션 조회)
+            const qImages = query(collection(db, BASE_PATH_PREFIX, 'images'), orderBy('createdAt'));
             onSnapshot(qImages, (snap) => {
                 const grid = document.getElementById('waiting-grid');
                 grid.innerHTML = '';
-                gameState.images = []; // 로컬 저장
-                
+                gameState.images = [];
                 snap.forEach(docSnap => {
                     const imgData = docSnap.data();
-                    gameState.images.push(imgData.data); // Base64 string
-                    
+                    gameState.images.push(imgData.data);
                     const img = document.createElement('img');
                     img.src = imgData.data;
                     img.className = "w-full aspect-square object-cover rounded border border-gray-600 bg-black";
@@ -321,8 +317,8 @@
                 document.getElementById('waiting-count').innerText = gameState.images.length;
             });
 
-            // (4) 채팅 리스너
-            const qChat = query(collection(db, PUBLIC_PATH, 'chat'), orderBy('timestamp', 'desc'), limit(50));
+            // (4) 채팅
+            const qChat = query(collection(db, BASE_PATH_PREFIX, 'chat'), orderBy('timestamp', 'desc'), limit(50));
             onSnapshot(qChat, (snap) => {
                 const box = document.getElementById('chat-box');
                 box.innerHTML = '';
@@ -344,7 +340,7 @@
         }
 
         // =========================================================================
-        // 4. UI 렌더링 및 로직
+        // 4. UI 렌더링
         // =========================================================================
         function renderGameUI(state) {
             const priceEl = document.getElementById('current-price');
@@ -356,7 +352,6 @@
 
             priceEl.innerText = state.currentPrice;
 
-            // 메인 이미지 표시
             if (state.currentItem) {
                 mainImg.src = state.currentItem;
                 mainImg.classList.remove('hidden');
@@ -366,29 +361,24 @@
                 placeholder.classList.remove('hidden');
             }
 
-            // 상태 메시지
             if (state.status === 'auction') {
                 const bidder = state.currentBidder ? `${state.currentBidder}팀` : '입찰 대기';
                 statusEl.innerHTML = `<span class="${state.currentBidder==='A'?'text-accentA':'text-accentB'}">${bidder}</span> 입찰 중`;
                 
-                // 턴에 따른 UI 활성화 (내 차례일 때만)
-                // 규칙: 현재 입찰자가 아닌 사람이 입찰 가능
-                // 단, 시작 직후(currentBidder=null)는 둘 다 가능
                 const isMyTurn = (myRole === 'A' && state.currentBidder !== 'A') || 
                                  (myRole === 'B' && state.currentBidder !== 'B');
-                
-                ctrlA.style.opacity = (myRole === 'A' && isMyTurn) ? '1' : '0.3';
-                ctrlA.style.pointerEvents = (myRole === 'A' && isMyTurn) ? 'auto' : 'none';
-                
-                ctrlB.style.opacity = (myRole === 'B' && isMyTurn) ? '1' : '0.3';
-                ctrlB.style.pointerEvents = (myRole === 'B' && isMyTurn) ? 'auto' : 'none';
+                const canBid = isMyTurn || state.currentBidder === null;
 
-                // 입력창 힌트 자동 업데이트
-                if(myRole === 'A') document.getElementById('input-a').value = state.currentPrice + 10;
-                if(myRole === 'B') document.getElementById('input-b').value = state.currentPrice + 10;
+                ctrlA.style.opacity = (myRole === 'A' && canBid) ? '1' : '0.3';
+                ctrlA.style.pointerEvents = (myRole === 'A' && canBid) ? 'auto' : 'none';
+                ctrlB.style.opacity = (myRole === 'B' && canBid) ? '1' : '0.3';
+                ctrlB.style.pointerEvents = (myRole === 'B' && canBid) ? 'auto' : 'none';
 
-            } else if (state.status === 'idle') {
-                statusEl.innerText = "다음 경매 대기중";
+                if(myRole === 'A' && canBid) document.getElementById('input-a').value = state.currentPrice + 10;
+                if(myRole === 'B' && canBid) document.getElementById('input-b').value = state.currentPrice + 10;
+
+            } else {
+                statusEl.innerText = state.status === 'rolling' ? "추첨 중..." : "다음 경매 대기중";
                 ctrlA.style.opacity = '0.3'; ctrlA.style.pointerEvents = 'none';
                 ctrlB.style.opacity = '0.3'; ctrlB.style.pointerEvents = 'none';
             }
@@ -407,20 +397,15 @@
         }
 
         // =========================================================================
-        // 5. 액션 함수 (Firebase 쓰기)
+        // 5. 액션 함수
         // =========================================================================
-        
-        // 이미지 업로드 (Base64 변환 후 Firestore 저장)
         window.uploadImages = async (files) => {
             if (!files.length) return;
-            // 간단하게 1개씩 처리
             for (let i = 0; i < files.length; i++) {
                 const reader = new FileReader();
                 reader.onload = async (e) => {
-                    const base64 = e.target.result;
-                    // 문서 용량 제한을 피하기 위해 이미지를 별도 컬렉션 문서로 저장
-                    await addDoc(collection(db, PUBLIC_PATH, 'images'), {
-                        data: base64,
+                    await addDoc(collection(db, BASE_PATH_PREFIX, 'images'), {
+                        data: e.target.result,
                         createdAt: serverTimestamp()
                     });
                 };
@@ -429,27 +414,20 @@
             sendSystemMessage("새로운 선수가 대기실에 등록되었습니다.");
         };
 
-        // 경매 시작 (룰렛)
         window.startAuction = async () => {
-            // 이미지가 없으면 시작 불가
             if (!gameState.images || gameState.images.length === 0) {
                 alert("대기실에 이미지가 없습니다!"); return;
             }
-
-            // DB 상태 변경 -> 'rolling'
-            // 실제 아이템 선정
             const randIdx = Math.floor(Math.random() * gameState.images.length);
             const selectedItem = gameState.images[randIdx];
 
-            // 트랜잭션 대신 간단한 update 사용
-            await updateDoc(doc(db, PUBLIC_PATH, 'game_state'), {
+            await updateDoc(getGameStateRef(), {
                 status: 'rolling',
-                rollingTarget: selectedItem, // 결과 미리 선정
+                rollingTarget: selectedItem,
                 timestamp: Date.now()
             });
         };
 
-        // 룰렛 효과 (클라이언트 사이드 연출)
         let isRolling = false;
         function handleRouletteEffect(data) {
             if (data.status === 'rolling' && !isRolling) {
@@ -459,41 +437,29 @@
                 overlay.classList.remove('hidden');
                 
                 let count = 0;
-                const maxCount = 20;
                 const interval = setInterval(() => {
                     const r = Math.floor(Math.random() * gameState.images.length);
                     imgEl.src = gameState.images[r];
                     count++;
-                    if (count >= maxCount) {
+                    if (count >= 20) {
                         clearInterval(interval);
-                        // 연출 끝, 실제 경매 상태로 전환 (이건 트리거한 사람이 하거나, 타임아웃으로 처리)
-                        // 여기서는 로컬에서 연출이 끝나면 UI만 정리하고, 
-                        // **누군가 한 명(보통 시작 누른 사람)**이 DB를 update해줘야 함.
-                        // 동기화 문제를 피하기 위해 'rolling' 상태를 3초 유지하고
-                        // 모든 클라이언트가 3초 뒤에 'rolling' 상태면 -> 알아서 오버레이 끄는 방식이 나음.
-                        // 하지만 DB 업데이트 권한은 'rolling'을 시작한 사람에게 주거나 리더에게 줌.
-                        
-                        setTimeout(() => {
-                           finishRolling(data.rollingTarget);
-                        }, 500);
+                        setTimeout(() => { finishRolling(data.rollingTarget); }, 500);
                     }
                 }, 100);
             }
         }
 
         async function finishRolling(targetItem) {
-            // 오버레이 끄기
             document.getElementById('roulette-overlay').classList.add('hidden');
             isRolling = false;
+            
+            // 리더A (없으면 리더B)가 상태 업데이트
+            const isLeaderA = myUid === gameState.teams.A?.leader;
+            const isLeaderB = myUid === gameState.teams.B?.leader;
+            const noLeaderA = !gameState.teams.A?.leader;
 
-            // 내가 리더A 이거나 (리더A가 없으면 리더B가) 상태 업데이트 총대 멤
-            // 중복 실행 방지를 위해 현재 상태가 아직 'rolling'인지 체크는 서버사이드 룰이 없으면 힘들지만
-            // 여기선 간단히 A팀장이 수행 (A없으면 B)
-            if ( (myRole === 'A') || (myRole === 'B' && !gameState.teams.A.leader) ) {
-                 // 대기실에서 이미지 제거해야 함 (Query로 찾아서 지워야 하는데 Base64라 매칭이 어려움)
-                 // *약식 구현*: 여기서는 대기실 이미지를 지우지 않고 복사본을 씀 (게임 단순화)
-                 
-                 await updateDoc(doc(db, PUBLIC_PATH, 'game_state'), {
+            if (isLeaderA || (noLeaderA && isLeaderB)) {
+                 await updateDoc(getGameStateRef(), {
                     status: 'auction',
                     currentItem: targetItem,
                     currentPrice: 10,
@@ -502,23 +468,21 @@
             }
         }
 
-        // 입찰
         window.placeBid = async (team) => {
             const inputId = team === 'A' ? 'input-a' : 'input-b';
             const bidAmount = parseInt(document.getElementById(inputId).value);
-            const myTeamMoney = gameState.teams[team].money;
+            const myTeamMoney = gameState.teams[team].money || 0;
 
             if (bidAmount > myTeamMoney) { alert("돈이 부족합니다!"); return; }
             if (bidAmount <= gameState.currentPrice) { alert("현재가보다 높아야 합니다."); return; }
 
-            await updateDoc(doc(db, PUBLIC_PATH, 'game_state'), {
+            await updateDoc(getGameStateRef(), {
                 currentPrice: bidAmount,
                 currentBidder: team
             });
             sendSystemMessage(`${team}팀이 ${bidAmount}원에 입찰했습니다!`);
         };
 
-        // 포기 (넘기기) -> 상대방 낙찰
         window.passTurn = async (team) => {
             if (!confirm("정말 포기하시겠습니까? 상대에게 낙찰됩니다.")) return;
             
@@ -526,16 +490,15 @@
             const price = gameState.currentPrice;
             const item = gameState.currentItem;
 
-            // 낙찰 로직 (돈 차감, 로스터 추가)
-            // 동시성 제어를 위해선 Transaction이 필요하지만 여기선 간단히
+            // 낙찰 처리
             const updates = {};
-            updates[`${opponent}.money`] = gameState.teams[opponent].money - price;
+            updates[`${opponent}.money`] = (gameState.teams[opponent].money || 0) - price;
             updates[`${opponent}.roster`] = arrayUnion(item);
 
-            await updateDoc(doc(db, PUBLIC_PATH, 'teams'), updates);
+            await updateDoc(getTeamsRef(), updates);
             
-            // 게임 상태 초기화
-            await updateDoc(doc(db, PUBLIC_PATH, 'game_state'), {
+            // 상태 초기화
+            await updateDoc(getGameStateRef(), {
                 status: 'idle',
                 currentBidder: null,
                 currentItem: null,
@@ -545,17 +508,14 @@
             sendSystemMessage(`🎉 [낙찰] ${opponent}팀이 ${price}원에 영입 성공!`);
         };
 
-        // 채팅 전송
         window.sendChat = async (e) => {
             e.preventDefault();
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
             if (!text) return;
-
-            const senderName = myRole === 'A' ? 'A팀장' : (myRole === 'B' ? 'B팀장' : '관전자');
             
-            await addDoc(collection(db, PUBLIC_PATH, 'chat'), {
-                sender: senderName,
+            await addDoc(collection(db, BASE_PATH_PREFIX, 'chat'), {
+                sender: myRole === 'A' ? 'A팀장' : (myRole === 'B' ? 'B팀장' : '관전자'),
                 role: myRole || 'spectator',
                 text: text,
                 type: 'msg',
@@ -565,31 +525,26 @@
         };
 
         async function sendSystemMessage(text) {
-            await addDoc(collection(db, PUBLIC_PATH, 'chat'), {
+            await addDoc(collection(db, BASE_PATH_PREFIX, 'chat'), {
                 text: text,
                 type: 'system',
                 timestamp: serverTimestamp()
             });
         }
 
-        // 게임 초기화 (Reset)
         window.resetGame = async () => {
             if (!confirm("모든 데이터를 초기화하시겠습니까? (팀원, 돈, 대기실 등)")) return;
             
-            // 1. 팀 정보 리셋
-            await setDoc(doc(db, PUBLIC_PATH, 'teams'), {
+            await setDoc(getTeamsRef(), {
                 A: { money: 1000, roster: [], leader: null },
                 B: { money: 1000, roster: [], leader: null }
             });
-            // 2. 게임 상태 리셋
-            await setDoc(doc(db, PUBLIC_PATH, 'game_state'), {
+            await setDoc(getGameStateRef(), {
                 status: 'idle',
                 currentPrice: 10,
                 currentBidder: null,
                 currentItem: null
             });
-            // 3. 채팅 리셋 (컬렉션 삭제는 클라이언트 SDK에서 어려우므로 무시하거나 관리자 기능 필요)
-            // 여기선 생략
             
             alert("초기화 완료. 페이지를 새로고침하세요.");
             location.reload();
