@@ -153,12 +153,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        // *** 중요: getDocs, deleteDoc가 반드시 포함되어야 합니다 ***
         import { getFirestore, doc, onSnapshot, updateDoc, setDoc, arrayUnion, collection, addDoc, query, orderBy, limit, serverTimestamp, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // =========================================================================
-        // [중요] 깃허브 배포 시 본인의 설정값으로 교체 필수!
-        // =========================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyAYyjK1qwPObsSXFSEmnye64iTFvcIY1Lg",
             authDomain: "auction-dfc5c.firebaseapp.com",
@@ -230,7 +226,7 @@
                 if (!snap.exists()) return;
                 const data = snap.data();
                 gameState = { ...gameState, ...data };
-                renderGameUI(data);
+                renderGameUI(gameState); // 항상 전체 상태를 전달
                 handleRouletteEffect(data);
             });
 
@@ -249,10 +245,8 @@
                 if(statusA) statusA.innerText = data.A?.leader ? '접속중' : '대기중';
                 if(statusB) statusB.innerText = data.B?.leader ? '접속중' : '대기중';
 
-                const bothReady = data.A?.leader && data.B?.leader;
-                const btnStart = document.getElementById('btn-start');
-                if (bothReady && gameState.status === 'idle') btnStart.classList.remove('hidden');
-                else btnStart.classList.add('hidden');
+                // 팀 상태가 변하면 버튼 UI도 갱신되어야 함
+                renderGameUI(gameState);
             });
 
             const qImages = query(collection(db, BASE_PATH, 'images'), orderBy('createdAt'));
@@ -262,7 +256,8 @@
                 gameState.images = [];
                 snap.forEach(docSnap => {
                     const imgData = docSnap.data();
-                    gameState.images.push(imgData.data);
+                    gameState.images.push({ id: docSnap.id, url: imgData.data });
+                    
                     const img = document.createElement('img');
                     img.src = imgData.data;
                     img.className = "w-full aspect-square object-cover rounded border border-gray-600 bg-black";
@@ -299,6 +294,7 @@
             const placeholder = document.getElementById('placeholder-text');
             const ctrlA = document.getElementById('ctrl-a');
             const ctrlB = document.getElementById('ctrl-b');
+            const btnStart = document.getElementById('btn-start');
 
             priceEl.innerText = state.currentPrice || 0;
 
@@ -326,10 +322,22 @@
 
                 if(myRole === 'A' && canBid) document.getElementById('input-a').value = (state.currentPrice || 0) + 10;
                 if(myRole === 'B' && canBid) document.getElementById('input-b').value = (state.currentPrice || 0) + 10;
+                
+                // 경매 중에는 버튼 숨김
+                btnStart.classList.add('hidden');
+
             } else {
                 statusEl.innerText = state.status === 'rolling' ? "추첨 중..." : "다음 경매 대기중";
                 ctrlA.style.opacity = '0.3'; ctrlA.style.pointerEvents = 'none';
                 ctrlB.style.opacity = '0.3'; ctrlB.style.pointerEvents = 'none';
+
+                // 대기(idle) 상태이고 양팀장이 존재하면 버튼 표시 (낙찰 후 여기서 버튼이 다시 나옴)
+                const bothReady = gameState.teams?.A?.leader && gameState.teams?.B?.leader;
+                if (bothReady && state.status === 'idle') {
+                    btnStart.classList.remove('hidden');
+                } else {
+                    btnStart.classList.add('hidden');
+                }
             }
         }
 
@@ -364,7 +372,7 @@
             const randIdx = Math.floor(Math.random() * gameState.images.length);
             await updateDoc(getGameStateRef(), {
                 status: 'rolling',
-                rollingTarget: gameState.images[randIdx],
+                rollingTarget: gameState.images[randIdx], 
                 timestamp: Date.now()
             });
         };
@@ -378,7 +386,8 @@
                 overlay.classList.remove('hidden');
                 let count = 0;
                 const interval = setInterval(() => {
-                    imgEl.src = gameState.images[Math.floor(Math.random() * gameState.images.length)];
+                    const randomImg = gameState.images[Math.floor(Math.random() * gameState.images.length)];
+                    if(randomImg) imgEl.src = randomImg.url;
                     count++;
                     if (count >= 20) {
                         clearInterval(interval);
@@ -391,10 +400,13 @@
         async function finishRolling(target) {
             document.getElementById('roulette-overlay').classList.add('hidden');
             isRolling = false;
-            // 중복 실행 방지: 리더 A가 대표로 업데이트 (없으면 리더 B)
             if (myRole === 'A' || (myRole === 'B' && !gameState.teams.A?.leader)) {
                  await updateDoc(getGameStateRef(), {
-                    status: 'auction', currentItem: target, currentPrice: 10, currentBidder: null
+                    status: 'auction', 
+                    currentItem: target.url,     
+                    currentItemId: target.id,    
+                    currentPrice: 10, 
+                    currentBidder: null
                 });
             }
         }
@@ -417,7 +429,16 @@
             updates[`${opponent}.roster`] = arrayUnion(gameState.currentItem);
             
             await updateDoc(getTeamsRef(), updates);
-            await updateDoc(getGameStateRef(), { status: 'idle', currentBidder: null, currentItem: null, currentPrice: 10 });
+
+            if (gameState.currentItemId) {
+                try {
+                    await deleteDoc(doc(db, BASE_PATH, 'images', gameState.currentItemId));
+                } catch(e) {
+                    console.error("이미지 삭제 실패:", e);
+                }
+            }
+
+            await updateDoc(getGameStateRef(), { status: 'idle', currentBidder: null, currentItem: null, currentItemId: null, currentPrice: 10 });
             sendSystemMessage(`🎉 [낙찰] ${opponent}팀이 ${price}원에 영입 성공!`);
         };
 
@@ -440,11 +461,9 @@
             await addDoc(collection(db, BASE_PATH, 'chat'), { text, type: 'system', timestamp: serverTimestamp() });
         }
 
-        // [핵심] 완전 초기화 로직 (이미지, 채팅 컬렉션 순회 삭제)
         window.resetGame = async () => {
             if (!confirm("정말 모든 데이터를 삭제하시겠습니까? (이미지 포함)")) return;
             
-            // 1. 문서 리셋
             await setDoc(getTeamsRef(), {
                 A: { money: 1000, roster: [], leader: null },
                 B: { money: 1000, roster: [], leader: null }
@@ -453,13 +472,11 @@
                 status: 'idle', currentPrice: 10, currentBidder: null, currentItem: null
             });
 
-            // 2. 이미지 컬렉션 전체 삭제
             const imagesQ = query(collection(db, BASE_PATH, 'images'));
             const imagesSnap = await getDocs(imagesQ);
             const imgPromises = imagesSnap.docs.map(doc => deleteDoc(doc.ref));
             await Promise.all(imgPromises);
 
-             // 3. 채팅 컬렉션 전체 삭제
             const chatQ = query(collection(db, BASE_PATH, 'chat'));
             const chatSnap = await getDocs(chatQ);
             const chatPromises = chatSnap.docs.map(doc => deleteDoc(doc.ref));
