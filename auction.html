@@ -175,7 +175,7 @@
         
         let myRole = null; 
         let myUid = null;
-        let gameState = { teams: { A: {}, B: {} } };
+        let gameState = { teams: { A: {}, B: {} }, status: 'idle' };
 
         const getTeamsRef = () => doc(db, BASE_PATH, 'teams', 'general');
         const getGameStateRef = () => doc(db, BASE_PATH, 'game_state', 'general');
@@ -226,7 +226,7 @@
                 if (!snap.exists()) return;
                 const data = snap.data();
                 gameState = { ...gameState, ...data };
-                renderGameUI(gameState); // 항상 전체 상태를 전달
+                renderGameUI(gameState);
                 handleRouletteEffect(data);
             });
 
@@ -245,7 +245,6 @@
                 if(statusA) statusA.innerText = data.A?.leader ? '접속중' : '대기중';
                 if(statusB) statusB.innerText = data.B?.leader ? '접속중' : '대기중';
 
-                // 팀 상태가 변하면 버튼 UI도 갱신되어야 함
                 renderGameUI(gameState);
             });
 
@@ -323,7 +322,6 @@
                 if(myRole === 'A' && canBid) document.getElementById('input-a').value = (state.currentPrice || 0) + 10;
                 if(myRole === 'B' && canBid) document.getElementById('input-b').value = (state.currentPrice || 0) + 10;
                 
-                // 경매 중에는 버튼 숨김
                 btnStart.classList.add('hidden');
 
             } else {
@@ -331,9 +329,9 @@
                 ctrlA.style.opacity = '0.3'; ctrlA.style.pointerEvents = 'none';
                 ctrlB.style.opacity = '0.3'; ctrlB.style.pointerEvents = 'none';
 
-                // 대기(idle) 상태이고 양팀장이 존재하면 버튼 표시 (낙찰 후 여기서 버튼이 다시 나옴)
-                const bothReady = gameState.teams?.A?.leader && gameState.teams?.B?.leader;
-                if (bothReady && state.status === 'idle') {
+                // 수정: 양쪽 다 접속해야만 버튼 표시 (&& 연산자 사용)
+                const isReady = gameState.teams?.A?.leader && gameState.teams?.B?.leader;
+                if (isReady && state.status === 'idle') {
                     btnStart.classList.remove('hidden');
                 } else {
                     btnStart.classList.add('hidden');
@@ -370,11 +368,13 @@
         window.startAuction = async () => {
             if (!gameState.images || gameState.images.length === 0) return alert("대기실에 이미지가 없습니다!");
             const randIdx = Math.floor(Math.random() * gameState.images.length);
-            await updateDoc(getGameStateRef(), {
+            
+            // 안전 장치: setDoc merge로 업데이트하여 문서가 없어도 생성되게 함
+            await setDoc(getGameStateRef(), {
                 status: 'rolling',
                 rollingTarget: gameState.images[randIdx], 
                 timestamp: Date.now()
-            });
+            }, { merge: true });
         };
 
         let isRolling = false;
