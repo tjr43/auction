@@ -149,7 +149,6 @@
         </div>
     </div>
 
-    <!-- Firebase SDK (getDocs, deleteDoc 추가됨) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -329,7 +328,6 @@
                 ctrlA.style.opacity = '0.3'; ctrlA.style.pointerEvents = 'none';
                 ctrlB.style.opacity = '0.3'; ctrlB.style.pointerEvents = 'none';
 
-                // 수정: 양쪽 다 접속해야만 버튼 표시 (&& 연산자 사용)
                 const isReady = gameState.teams?.A?.leader && gameState.teams?.B?.leader;
                 if (isReady && state.status === 'idle') {
                     btnStart.classList.remove('hidden');
@@ -368,11 +366,12 @@
         window.startAuction = async () => {
             if (!gameState.images || gameState.images.length === 0) return alert("대기실에 이미지가 없습니다!");
             const randIdx = Math.floor(Math.random() * gameState.images.length);
-            
-            // 안전 장치: setDoc merge로 업데이트하여 문서가 없어도 생성되게 함
+            const targetObj = gameState.images[randIdx];
+
+            // 명시적으로 객체 복사하여 저장 (참조 오류 및 데이터 누락 방지)
             await setDoc(getGameStateRef(), {
                 status: 'rolling',
-                rollingTarget: gameState.images[randIdx], 
+                rollingTarget: { id: targetObj.id, url: targetObj.url }, 
                 timestamp: Date.now()
             }, { merge: true });
         };
@@ -384,13 +383,19 @@
                 const overlay = document.getElementById('roulette-overlay');
                 const imgEl = document.getElementById('roulette-img');
                 overlay.classList.remove('hidden');
+                
                 let count = 0;
+                // 안전한 이미지 풀 사용
+                const pool = gameState.images && gameState.images.length > 0 ? gameState.images : [{url: ''}];
+
                 const interval = setInterval(() => {
-                    const randomImg = gameState.images[Math.floor(Math.random() * gameState.images.length)];
-                    if(randomImg) imgEl.src = randomImg.url;
+                    const randomImg = pool[Math.floor(Math.random() * pool.length)];
+                    if(randomImg && randomImg.url) imgEl.src = randomImg.url;
+                    
                     count++;
                     if (count >= 20) {
                         clearInterval(interval);
+                        // 데이터가 확실한지 확인하고 전달
                         setTimeout(() => finishRolling(data.rollingTarget), 500);
                     }
                 }, 100);
@@ -400,6 +405,13 @@
         async function finishRolling(target) {
             document.getElementById('roulette-overlay').classList.add('hidden');
             isRolling = false;
+
+            // 방어 코드: target이 없으면 실행 중단 (빈 화면 방지)
+            if (!target || !target.url) {
+                console.error("Target is invalid:", target);
+                return;
+            }
+
             if (myRole === 'A' || (myRole === 'B' && !gameState.teams.A?.leader)) {
                  await updateDoc(getGameStateRef(), {
                     status: 'auction', 
