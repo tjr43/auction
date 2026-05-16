@@ -28,7 +28,6 @@
 </head>
 <body class="h-screen flex flex-col">
 
-    <!-- 로그인 모달 -->
     <div id="login-modal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
         <div class="bg-panel p-8 rounded-xl max-w-md w-full text-center border border-gray-700 shadow-2xl">
             <h2 class="text-3xl font-bold text-highlight mb-6">🎲 온라인 경매 입장</h2>
@@ -50,7 +49,6 @@
         </div>
     </div>
 
-    <!-- 헤더 -->
     <header class="bg-black border-b border-gray-700 h-14 flex items-center justify-between px-6 shrink-0">
         <div class="flex items-center gap-2">
             <i class="fa-solid fa-gavel text-highlight"></i>
@@ -63,7 +61,6 @@
     </header>
 
     <div class="flex flex-1 overflow-hidden">
-        <!-- 왼쪽: 대기실 -->
         <div class="w-1/5 bg-panel border-r border-gray-700 flex flex-col p-4">
             <h3 class="font-bold mb-4 flex justify-between items-center">
                 <span>📂 대기실</span>
@@ -78,7 +75,6 @@
             <div id="waiting-grid" class="flex-1 overflow-y-auto grid grid-cols-2 gap-2 content-start pr-1"></div>
         </div>
 
-        <!-- 중앙: 경매 스테이지 -->
         <div class="w-1/2 bg-dark flex flex-col relative">
             <div class="flex-1 flex flex-col justify-center items-center p-8">
                 <div class="relative w-80 h-80 bg-black rounded-2xl border-4 border-gray-600 shadow-2xl overflow-hidden flex justify-center items-center mb-6">
@@ -95,12 +91,18 @@
                     <div class="text-5xl font-bold text-highlight drop-shadow-lg"><span id="current-price">0</span>원</div>
                     <div id="auction-status" class="h-6 text-sm text-gray-500">시작 전</div>
                 </div>
+                
                 <button id="btn-start" onclick="startAuction()" class="mt-8 px-8 py-3 bg-highlight text-black font-bold rounded-full hover:bg-yellow-400 transition hidden shadow-lg shadow-yellow-500/20">
                     START AUCTION
                 </button>
+
+                <div id="skip-container" class="mt-4 hidden text-center">
+                    <button id="btn-skip" onclick="voteSkip()" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-full transition shadow-lg text-sm border border-gray-500">
+                        🤝 순서 미루기 (합의) - <span id="skip-status">0/2</span>
+                    </button>
+                </div>
             </div>
 
-            <!-- 컨트롤 패널 -->
             <div class="h-48 border-t border-gray-700 flex">
                 <div id="ctrl-a" class="flex-1 bg-gradient-to-t from-red-900/20 to-transparent p-4 flex flex-col items-center justify-center opacity-30 pointer-events-none transition-all duration-300">
                     <h4 class="text-accentA font-bold mb-2">TEAM A</h4>
@@ -121,7 +123,6 @@
             </div>
         </div>
 
-        <!-- 오른쪽: 정보 및 채팅 -->
         <div class="w-[30%] bg-panel border-l border-gray-700 flex flex-col p-4">
             <div class="space-y-4 mb-4">
                 <div class="bg-dark p-3 rounded-lg border-l-4 border-accentA">
@@ -174,7 +175,7 @@
         
         let myRole = null; 
         let myUid = null;
-        let gameState = { teams: { A: {}, B: {} }, status: 'idle' };
+        let gameState = { teams: { A: {}, B: {} }, status: 'idle', skipVotes: { A: false, B: false } };
 
         const getTeamsRef = () => doc(db, BASE_PATH, 'teams', 'general');
         const getGameStateRef = () => doc(db, BASE_PATH, 'game_state', 'general');
@@ -293,6 +294,8 @@
             const ctrlA = document.getElementById('ctrl-a');
             const ctrlB = document.getElementById('ctrl-b');
             const btnStart = document.getElementById('btn-start');
+            const skipContainer = document.getElementById('skip-container');
+            const btnSkip = document.getElementById('btn-skip');
 
             priceEl.innerText = state.currentPrice || 0;
 
@@ -322,6 +325,24 @@
                 if(myRole === 'B' && canBid) document.getElementById('input-b').value = (state.currentPrice || 0) + 10;
                 
                 btnStart.classList.add('hidden');
+                
+                // 순서 미루기 버튼 표시 로직
+                skipContainer.classList.remove('hidden');
+                const votes = state.skipVotes || { A: false, B: false };
+                let agreeCount = (votes.A ? 1 : 0) + (votes.B ? 1 : 0);
+                
+                if (myRole === 'A' || myRole === 'B') {
+                    if (votes[myRole]) {
+                        btnSkip.innerText = "상대방 동의 대기중...";
+                        btnSkip.className = "px-6 py-2 bg-green-700 text-white rounded-full shadow-lg text-sm border border-green-500 cursor-not-allowed opacity-80";
+                    } else {
+                        btnSkip.innerText = `🤝 순서 미루기 (합의) - ${agreeCount}/2`;
+                        btnSkip.className = "px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-full transition shadow-lg text-sm border border-gray-500";
+                    }
+                } else {
+                    btnSkip.innerText = `🤝 순서 미루기 현황 - ${agreeCount}/2`;
+                    btnSkip.className = "px-6 py-2 bg-gray-800 text-gray-400 rounded-full shadow-lg text-sm border border-gray-700 cursor-not-allowed";
+                }
 
             } else {
                 statusEl.innerText = state.status === 'rolling' ? "추첨 중..." : "다음 경매 대기중";
@@ -334,6 +355,9 @@
                 } else {
                     btnStart.classList.add('hidden');
                 }
+                
+                // 순서 미루기 버튼 숨기기
+                skipContainer.classList.add('hidden');
             }
         }
 
@@ -368,7 +392,6 @@
             const randIdx = Math.floor(Math.random() * gameState.images.length);
             const targetObj = gameState.images[randIdx];
 
-            // 명시적으로 객체 복사하여 저장 (참조 오류 및 데이터 누락 방지)
             await setDoc(getGameStateRef(), {
                 status: 'rolling',
                 rollingTarget: { id: targetObj.id, url: targetObj.url }, 
@@ -385,7 +408,6 @@
                 overlay.classList.remove('hidden');
                 
                 let count = 0;
-                // 안전한 이미지 풀 사용
                 const pool = gameState.images && gameState.images.length > 0 ? gameState.images : [{url: ''}];
 
                 const interval = setInterval(() => {
@@ -395,7 +417,6 @@
                     count++;
                     if (count >= 20) {
                         clearInterval(interval);
-                        // 데이터가 확실한지 확인하고 전달
                         setTimeout(() => finishRolling(data.rollingTarget), 500);
                     }
                 }, 100);
@@ -406,7 +427,6 @@
             document.getElementById('roulette-overlay').classList.add('hidden');
             isRolling = false;
 
-            // 방어 코드: target이 없으면 실행 중단 (빈 화면 방지)
             if (!target || !target.url) {
                 console.error("Target is invalid:", target);
                 return;
@@ -418,7 +438,8 @@
                     currentItem: target.url,     
                     currentItemId: target.id,    
                     currentPrice: 10, 
-                    currentBidder: null
+                    currentBidder: null,
+                    skipVotes: { A: false, B: false } // 상태 초기화 추가
                 });
             }
         }
@@ -450,8 +471,43 @@
                 }
             }
 
-            await updateDoc(getGameStateRef(), { status: 'idle', currentBidder: null, currentItem: null, currentItemId: null, currentPrice: 10 });
+            await updateDoc(getGameStateRef(), { 
+                status: 'idle', currentBidder: null, currentItem: null, currentItemId: null, currentPrice: 10,
+                skipVotes: { A: false, B: false } // 상태 초기화 추가
+            });
             sendSystemMessage(`🎉 [낙찰] ${opponent}팀이 ${price}원에 영입 성공!`);
+        };
+
+        // 순서 미루기 함수 추가
+        window.voteSkip = async () => {
+            if (myRole !== 'A' && myRole !== 'B') return alert("팀장만 누를 수 있습니다.");
+            if (gameState.status !== 'auction') return;
+            
+            const otherTeam = myRole === 'A' ? 'B' : 'A';
+            const currentVotes = gameState.skipVotes || { A: false, B: false };
+
+            if (currentVotes[myRole]) {
+                return alert("이미 동의하셨습니다.");
+            }
+
+            // 상대방이 이미 동의한 상태에서 내가 누른 경우 -> 미루기 확정
+            if (currentVotes[otherTeam]) {
+                await updateDoc(getGameStateRef(), {
+                    status: 'idle',
+                    currentBidder: null,
+                    currentItem: null,
+                    currentItemId: null,
+                    currentPrice: 10,
+                    skipVotes: { A: false, B: false } // 투표 상태 초기화
+                });
+                sendSystemMessage("🤝 양 팀의 합의로 해당 선수 경매가 뒤로 미뤄졌습니다.");
+            } else {
+                // 나만 먼저 동의한 경우 -> 내 동의 상태만 저장
+                await updateDoc(getGameStateRef(), {
+                    [`skipVotes.${myRole}`]: true
+                });
+                sendSystemMessage(`⏳ ${myRole}팀장이 순서 미루기에 동의했습니다. (상대팀 동의 대기중)`);
+            }
         };
 
         window.sendChat = async (e) => {
@@ -481,7 +537,8 @@
                 B: { money: 1000, roster: [], leader: null }
             });
             await setDoc(getGameStateRef(), {
-                status: 'idle', currentPrice: 10, currentBidder: null, currentItem: null
+                status: 'idle', currentPrice: 10, currentBidder: null, currentItem: null,
+                skipVotes: { A: false, B: false } // 상태 초기화 추가
             });
 
             const imagesQ = query(collection(db, BASE_PATH, 'images'));
